@@ -127,16 +127,21 @@ class GeneratorUpsampleBlock(nn.Module):
           return y, self.NonLinearity3(y)
 
 class Generator(nn.Module):
-    def __init__(self, StemWidth=256, FeatureWidths=[512, 256], BlocksPerStage=[16, 16, 16, 16]):
+    def __init__(self, StemWidth=256, FeatureWidths=[512, 256, 128], BlocksPerStage=[16, 16, 16, 16]):
         super(Generator, self).__init__()
         
         self.Stem = GeneratorOpeningLayer(StemWidth, FeatureWidths[0])
         self.Stages = nn.ModuleList([GeneratorStage(StemWidth, FeatureWidths[0], x) for x in BlocksPerStage])
         
         self.FeatureNonLinearity = BiasedActivation(FeatureWidths[0])
-
-        self.Upsample2x = GeneratorUpsampleBlock(FeatureWidths[0], FeatureWidths[1])
-        self.ToRGB2x = MSRInitializer(nn.Conv2d(FeatureWidths[1], 3, kernel_size=1, stride=1, padding=0, bias=False), ActivationGain=0)
+        
+        Upsamplers = []
+        ToRGB = []
+        for x in range(len(FeatureWidths) - 1):
+            Upsamplers += [GeneratorUpsampleBlock(FeatureWidths[x], FeatureWidths[x + 1])]
+            ToRGB += [MSRInitializer(nn.Conv2d(FeatureWidths[x + 1], 3, kernel_size=1, stride=1, padding=0, bias=False), ActivationGain=0)]
+        self.Upsamplers = nn.ModuleList(Upsamplers)
+        self.ToRGB = nn.ModuleList(ToRGB)
         
     def forward(self, x):
         ImageOutput = x
@@ -147,8 +152,9 @@ class Generator(nn.Module):
             AggregatedFeatures += FeatureResidual
         ActivatedFeatures = self.FeatureNonLinearity(AggregatedFeatures)
         
-        x, ActivationMaps = self.Upsample2x(AggregatedFeatures, ActivatedFeatures)
-        ImageOutput = nn.functional.interpolate(ImageOutput, scale_factor=2, mode='bilinear', align_corners=False) + self.ToRGB2x(ActivationMaps)
+        for Upsample, Aggregate in zip(self.Upsamplers, self.ToRGB):
+            AggregatedFeatures, ActivatedFeatures = Upsample(AggregatedFeatures, ActivatedFeatures)
+            ImageOutput = nn.functional.interpolate(ImageOutput, scale_factor=2, mode='bilinear', align_corners=False) + Aggregate(ActivatedFeatures)
         
         return ImageOutput
 
@@ -162,10 +168,11 @@ class Generator(nn.Module):
 
 
 #### quick test ####
-# m = Generator()
+# Network2x = Generator(FeatureWidths=[512, 256])
+# Network4x = Generator()
 
-# print('params: ' + str(sum(p.numel() for p in m.parameters() if p.requires_grad)))
+# print('params: ' + str(sum(p.numel() for p in Network4x.parameters() if p.requires_grad)))
 
 # x = torch.rand((12, 3, 32, 32))
-# y = m(x)
+# y = Network4x(x)
 # print(y.shape)
