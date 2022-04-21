@@ -49,7 +49,7 @@ class SRDataset(Dataset):
         # Randomly crop both images (make sure that same corresponding regions are being cropped!!!)
         i, j, h, w = transforms.RandomCrop.get_params(input_img, output_size=(self.cropSize, self.cropSize))
         input_img = transforms.functional.crop(input_img, i, j, h, w)
-        target_img = transforms.functional.crop(target_img, i*2, j*2, h*2, w*2)
+        target_img = transforms.functional.crop(target_img, i*4, j*4, h*4, w*4)
 
         # Randomly hor flip both images
         if random.random() > 0.5:
@@ -115,7 +115,7 @@ def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     
     netG = Generator().to(device)
-    optimizerG = optim.Adam(netG.parameters(), lr=opt.lr, betas=(0.9, 0.999))
+    optimizerG = optim.Adam(netG.parameters(), lr=opt.lr, betas=(0.9, 0.999), eps=1e-08)
 
     if model is not None:
         netG.load_state_dict(model['g_state_dict'], strict=True)
