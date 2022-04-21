@@ -58,6 +58,7 @@ def main():
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate')
     parser.add_argument('--workers', type=int, help='number of data loading workers', default=2)
     parser.add_argument('--outf', default='.', help='folder to output images and model checkpoints')
+    parser.add_argument('--accSteps', type=int, default=10, help='accumulation steps')
 
     model = None # Can change to load in a checkpoint
 
@@ -99,10 +100,10 @@ def main():
 
     print('G params: ' + str(sum(p.numel() for p in netG.parameters() if p.requires_grad)))
 
-    for epoch in range(0 if model is None else model['epoch'] + 1, 1000000):
+    netG.zero_grad()
+    for epoch in range(0 if model is None else model['epoch'] + 1, 1000):
         for i, sample in enumerate(dataloader, 0):
             netG.requires_grad = True
-            netG.zero_grad()
             
             data_img_batch = sample[:, 0, :, :, :]
             target_img_batch = sample[:, 1, :, :, :]
@@ -111,9 +112,12 @@ def main():
 
             loss = torch.nn.L1Loss()
             errG = loss(output_img_batch, target_img_batch)
-
             errG.backward()
-            optimizerG.step()
+
+            # Gradient accumulation
+            if (i + 1) % opt.accSteps == 0:
+                optimizerG.step()
+                netG.zero_grad()
 
             ###########################
 
@@ -123,7 +127,7 @@ def main():
 
             ###########################
 
-            if i % 100 == 0:
+            if (i + 1) % 100 == 0:
                 vutils.save_image(data_img_batch, '%s/lr_samples.png' % opt.outf, normalize=True, nrow=3)
                 vutils.save_image(target_img_batch, '%s/hr_real_samples.png' % opt.outf, normalize=True, nrow=3)
                 vutils.save_image(output_img_batch, '%s/hr_fake_samples.png' % opt.outf, normalize=True, nrow=3)
