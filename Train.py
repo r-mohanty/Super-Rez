@@ -17,14 +17,16 @@ from PIL import Image
 """
 Expected Dataset File Structure:
 
-DIV2k
+DIV2K
 -> DIV2K_train_HR
     -> HR images
 -> DIV2K_train_LR_bicubic
-    -> X2
+    -> X4
         -> LR images
 
-Download data from here: https://data.vision.ee.ethz.ch/cvl/DIV2K/
+Download link for HR images: http://data.vision.ee.ethz.ch/cvl/DIV2K/DIV2K_train_HR.zip
+Download link for LR images: http://data.vision.ee.ethz.ch/cvl/DIV2K/DIV2K_train_LR_bicubic_X4.zip
+^ Paste these links into a web browser to download, then put the unzipped folders into a folder called "DIV2K" ^
 """
 
 class SRDataset(Dataset):
@@ -56,10 +58,10 @@ class SRDataset(Dataset):
             input_img = transforms.functional.hflip(input_img)
             target_img = transforms.functional.hflip(target_img)
 
-        # Randomly vert flip both images
-        if random.random() > 0.5:
-            input_img = transforms.functional.vflip(input_img)
-            target_img = transforms.functional.vflip(target_img)
+        # Randomly 90 deg flip both images
+        k = random.randint(0, 3)
+        input_img = transforms.functional.rotate(input_img, k * 90)
+        target_img = transforms.functional.rotate(target_img, k * 90)
 
         input_img = transforms.functional.to_tensor(input_img)
         target_img = transforms.functional.to_tensor(target_img)
@@ -71,7 +73,7 @@ class SRDataset(Dataset):
             return img.convert("RGB")
 
     def make_dataset(self, directory):
-        data_folder = os.path.join(directory, "DIV2K_train_LR_bicubic", "X2")
+        data_folder = os.path.join(directory, "DIV2K_train_LR_bicubic", "X4")
         target_folder = os.path.join(directory, "DIV2K_train_HR")
         data_paths = [os.path.join(data_folder, f) for f in sorted(os.listdir(data_folder)) if f.endswith(".png")]
         target_paths = [os.path.join(target_folder, f) for f in sorted(os.listdir(target_folder)) if f.endswith(".png")]
@@ -86,7 +88,6 @@ def main():
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate')
     parser.add_argument('--workers', type=int, help='number of data loading workers', default=2)
     parser.add_argument('--outf', default='.', help='folder to output images and model checkpoints')
-    parser.add_argument('--accSteps', type=int, default=10, help='accumulation steps')
 
     model = None # Can change to load in a checkpoint
 
@@ -124,14 +125,15 @@ def main():
     print('G params: ' + str(sum(p.numel() for p in netG.parameters() if p.requires_grad)))
 
     netG.zero_grad()
-    for epoch in range(0 if model is None else model['epoch'] + 1, 10000):
+    for epoch in range(0 if model is None else model['epoch'] + 1, 100000):
         for i, sample in enumerate(dataloader):
             netG.requires_grad = True
-            
+            netG.zero_grad()
+
             input_img_batch = sample[0]
             target_img_batch = sample[1]
 
-            # Quick test to make sure that we're cropping properly
+            #### Quick test to make sure that we're cropping properly ####
             # import matplotlib.pyplot as plt
             # f, axarr = plt.subplots(1,2)
             # axarr[0].imshow(input_img_batch[0].permute(1, 2, 0))
@@ -141,14 +143,10 @@ def main():
 
             output_img_batch = netG(input_img_batch)
 
-            loss = torch.nn.L1Loss()
-            errG = loss(output_img_batch, target_img_batch)
+            L1 = torch.nn.L1Loss()
+            errG = L1(output_img_batch, target_img_batch)
             errG.backward()
-
-            # Gradient accumulation
-            if (i + 1) % opt.accSteps == 0:
-                optimizerG.step()
-                netG.zero_grad()
+            optimizerG.step()
 
             ###########################
 

@@ -49,86 +49,113 @@ class GeneratorBlock(nn.Module):
           
           return y, self.NonLinearity2(y)
       
-def CreateLowpassKernel(InputChannels):
-    Kernel = numpy.array([[1., 3., 3., 1.]])
-    Kernel = torch.Tensor(Kernel.T @ Kernel)
-    Kernel = Kernel / torch.sum(Kernel)
-    return Kernel.repeat((InputChannels, 1, 1, 1))
-
-class Upsampler(nn.Module):
-      def __init__(self, InputChannels):
-          super(Upsampler, self).__init__()
-          
-          self.register_buffer('Kernel', CreateLowpassKernel(InputChannels))
-          self.InputChannels = InputChannels
-          
-      def forward(self, x):
-          x = nn.functional.pixel_shuffle(x, 2)
-          return nn.functional.conv2d(nn.functional.pad(x, (2, 1, 2, 1), mode='reflect'), self.Kernel, stride=1, groups=self.InputChannels)
-
-class GeneratorAggregationBlock(nn.Module):
-      def __init__(self, InputChannels, ReceptiveField=3):
-          super(GeneratorAggregationBlock, self).__init__()
-          
-          CompressedChannels = InputChannels // CompressionFactor
-          
-          self.LinearLayer = MSRInitializer(nn.Conv2d(InputChannels, CompressedChannels * 4, kernel_size=1, stride=1, padding=0, bias=False), ActivationGain=SiLUGain)
-          self.NonLinearity = BiasedActivation(CompressedChannels * 4)
-
-          self.ToRGB = MSRInitializer(nn.Conv2d(CompressedChannels, 3, kernel_size=ReceptiveField, stride=1, padding=(ReceptiveField - 1) // 2, padding_mode='reflect', bias=False), ActivationGain=0)
-          self.Resampler = Upsampler(CompressedChannels)
-          
-      def forward(self, ActivationMaps):
-          y = self.LinearLayer(ActivationMaps)
-          y = self.Resampler(self.NonLinearity(y))
-
-          return self.ToRGB(y)
-
-class GeneratorStage(nn.Module):
-      def __init__(self, InputChannels, Blocks, ReceptiveField=3):
-          super(GeneratorStage, self).__init__()
-          
-          self.MainBlocks = nn.ModuleList([GeneratorBlock(InputChannels, ReceptiveField) for _ in range(Blocks)])
-          self.Aggregate = GeneratorAggregationBlock(InputChannels, ReceptiveField)
-          
-      def forward(self, x, ActivationMaps):
-          for Block in self.MainBlocks:
-              x, ActivationMaps = Block(x, ActivationMaps)
-        
-          return x, ActivationMaps, self.Aggregate(ActivationMaps)
-      
 class GeneratorOpeningLayer(nn.Module):
-    def __init__(self, OutputChannels, ReceptiveField=3):
+    def __init__(self, OutputChannels, FeatureChannels, ReceptiveField=3):
         super(GeneratorOpeningLayer, self).__init__()
         
         self.LinearLayer = MSRInitializer(nn.Conv2d(3, OutputChannels, kernel_size=ReceptiveField, stride=1, padding=(ReceptiveField - 1) // 2, padding_mode='reflect', bias=False), ActivationGain=SiLUGain)
         self.NonLinearity = BiasedActivation(OutputChannels)
         
-        self.Aggregate = GeneratorAggregationBlock(OutputChannels, ReceptiveField)
+        self.ToFeatures = MSRInitializer(nn.Conv2d(OutputChannels, FeatureChannels, kernel_size=1, stride=1, padding=0, bias=False), ActivationGain=SiLUGain)
         
     def forward(self, x):
         x = self.LinearLayer(x)
         ActivationMaps = self.NonLinearity(x)
         
-        return x, ActivationMaps, self.Aggregate(ActivationMaps)
+        return x, ActivationMaps, self.ToFeatures(ActivationMaps)
+
+class GeneratorStage(nn.Module):
+      def __init__(self, InputChannels, FeatureChannels, Blocks, ReceptiveField=3):
+          super(GeneratorStage, self).__init__()
+          
+          self.MainBlocks = nn.ModuleList([GeneratorBlock(InputChannels, ReceptiveField) for _ in range(Blocks)])
+          self.ToFeatures = MSRInitializer(nn.Conv2d(InputChannels, FeatureChannels, kernel_size=1, stride=1, padding=0, bias=False), ActivationGain=0)
+          
+      def forward(self, x, ActivationMaps):
+          for Block in self.MainBlocks:
+              x, ActivationMaps = Block(x, ActivationMaps)
+        
+          return x, ActivationMaps, self.ToFeatures(ActivationMaps)
+      
+def CreateLowpassKernel():
+    Kernel = numpy.array([[1., 3., 3., 1.]])
+    Kernel = torch.Tensor(Kernel.T @ Kernel)
+    Kernel = Kernel / torch.sum(Kernel)
+    return Kernel.view(1, 1, Kernel.shape[0], Kernel.shape[1])
+
+class Upsampler(nn.Module):
+      def __init__(self):
+          super(Upsampler, self).__init__()
+          
+          self.register_buffer('Kernel', CreateLowpassKernel())
+          
+      def forward(self, x):
+          x = nn.functional.pixel_shuffle(x, 2)
+          y = nn.functional.pad(x, (2, 1, 2, 1), mode='reflect')
+          
+          return nn.functional.conv2d(y.view(y.shape[0] * y.shape[1], 1, y.shape[2], y.shape[3]), self.Kernel, stride=1).view(*x.shape)
+          
+class GeneratorUpsampleBlock(nn.Module):
+      def __init__(self, InputChannels, OutputChannels, ReceptiveField=3):
+          super(GeneratorUpsampleBlock, self).__init__()
+          
+          CompressedChannels = InputChannels // CompressionFactor
+          
+          self.LinearLayer1 = MSRInitializer(nn.Conv2d(InputChannels, CompressedChannels, kernel_size=ReceptiveField, stride=1, padding=(ReceptiveField - 1) // 2, padding_mode='reflect', bias=False), ActivationGain=SiLUGain)
+          self.LinearLayer2 = MSRInitializer(nn.Conv2d(CompressedChannels, CompressedChannels * 4, kernel_size=1, stride=1, padding=0, bias=False), ActivationGain=SiLUGain)
+          self.LinearLayer3 = MSRInitializer(nn.Conv2d(CompressedChannels, OutputChannels, kernel_size=ReceptiveField, stride=1, padding=(ReceptiveField - 1) // 2, padding_mode='reflect', bias=False), ActivationGain=0)
+          
+          self.NonLinearity1 = BiasedActivation(CompressedChannels)
+          self.NonLinearity2 = BiasedActivation(CompressedChannels * 4)
+          self.NonLinearity3 = BiasedActivation(OutputChannels)
+          
+          self.Resampler = Upsampler()
+          if InputChannels != OutputChannels:
+              self.ShortcutLayer = MSRInitializer(nn.Conv2d(InputChannels, OutputChannels, kernel_size=1, stride=1, padding=0, bias=False))
+
+      def forward(self, x, ActivationMaps):
+          if hasattr(self, 'ShortcutLayer'):
+              x = self.ShortcutLayer(x)
+          
+          y = self.LinearLayer1(ActivationMaps)
+          y = self.LinearLayer2(self.NonLinearity1(y))
+          y = self.Resampler(self.NonLinearity2(y))
+          
+          y = self.LinearLayer3(y)
+          y = nn.functional.interpolate(x, scale_factor=2, mode='bilinear', align_corners=False) + y
+          
+          return y, self.NonLinearity3(y)
 
 class Generator(nn.Module):
-    def __init__(self, StemWidth=256, BlocksPerStage=[16, 16, 16, 16]):
+    def __init__(self, StemWidth=256, FeatureWidths=[512, 256, 128], BlocksPerStage=[16, 16, 16, 16]):
         super(Generator, self).__init__()
         
-        self.Stem = GeneratorOpeningLayer(StemWidth)
-        self.Stages = nn.ModuleList([GeneratorStage(StemWidth, x) for x in BlocksPerStage])
+        self.Stem = GeneratorOpeningLayer(StemWidth, FeatureWidths[0])
+        self.Stages = nn.ModuleList([GeneratorStage(StemWidth, FeatureWidths[0], x) for x in BlocksPerStage])
+        
+        self.FeatureNonLinearity = BiasedActivation(FeatureWidths[0])
+        
+        Upsamplers = []
+        ToRGB = []
+        for x in range(len(FeatureWidths) - 1):
+            Upsamplers += [GeneratorUpsampleBlock(FeatureWidths[x], FeatureWidths[x + 1])]
+            ToRGB += [MSRInitializer(nn.Conv2d(FeatureWidths[x + 1], 3, kernel_size=1, stride=1, padding=0, bias=False), ActivationGain=0)]
+        self.Upsamplers = nn.ModuleList(Upsamplers)
+        self.ToRGB = nn.ModuleList(ToRGB)
         
     def forward(self, x):
-        ImageOutput = nn.functional.interpolate(x, scale_factor=2, mode='bilinear', align_corners=False)
+        ImageOutput = x
         
-        x, ActivationMaps, HighFrequencyResidual = self.Stem(x)
-        ImageOutput += HighFrequencyResidual
-        
+        x, ActivationMaps, AggregatedFeatures = self.Stem(x)
         for Stage in self.Stages:
-            x, ActivationMaps, HighFrequencyResidual = Stage(x, ActivationMaps)
-            ImageOutput += HighFrequencyResidual
-            
+            x, ActivationMaps, FeatureResidual  = Stage(x, ActivationMaps)
+            AggregatedFeatures += FeatureResidual
+        ActivatedFeatures = self.FeatureNonLinearity(AggregatedFeatures)
+        
+        for Upsample, Aggregate in zip(self.Upsamplers, self.ToRGB):
+            AggregatedFeatures, ActivatedFeatures = Upsample(AggregatedFeatures, ActivatedFeatures)
+            ImageOutput = nn.functional.interpolate(ImageOutput, scale_factor=2, mode='bilinear', align_corners=False) + Aggregate(ActivatedFeatures)
+        
         return ImageOutput
 
 
@@ -141,10 +168,11 @@ class Generator(nn.Module):
 
 
 #### quick test ####
-# m = Generator()
+# Network2x = Generator(FeatureWidths=[512, 256])
+# Network4x = Generator()
 
-# print('params: ' + str(sum(p.numel() for p in m.parameters() if p.requires_grad)))
+# print('params: ' + str(sum(p.numel() for p in Network4x.parameters() if p.requires_grad)))
 
 # x = torch.rand((12, 3, 32, 32))
-# y = m(x)
+# y = Network4x(x)
 # print(y.shape)
