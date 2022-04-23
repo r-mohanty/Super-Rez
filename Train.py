@@ -87,11 +87,12 @@ def main():
     parser.add_argument('--imageSize', type=int, default=48, help='the height / width of the input image to network')
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate')
     parser.add_argument('--workers', type=int, help='number of data loading workers', default=2)
-    parser.add_argument('--outf', default='.', help='folder to output images and model checkpoints')
-
-    model = None # Can change to load in a checkpoint
+    parser.add_argument('--outf', default='./Output', help='folder to output images and model checkpoints')
 
     opt = parser.parse_args()
+
+    model = None
+    # model = torch.load(os.path.join(opt.outf, 'epoch_1.pth'), map_location='cpu')
 
     try:
         os.makedirs(opt.outf)
@@ -121,10 +122,11 @@ def main():
     if model is not None:
         netG.load_state_dict(model['g_state_dict'], strict=True)
         optimizerG.load_state_dict(model['optimizerG_state_dict'])
+        print("Loaded model that was trained until epoch %d" % (model['epoch']))
 
     print('G params: ' + str(sum(p.numel() for p in netG.parameters() if p.requires_grad)))
 
-    netG.zero_grad()
+    minibatch_updates = 0
     for epoch in range(0 if model is None else model['epoch'] + 1, 100000):
         for i, sample in enumerate(dataloader):
             netG.requires_grad = True
@@ -156,17 +158,27 @@ def main():
 
             ###########################
 
-            if (i + 1) % 100 == 0:
-                vutils.save_image(input_img_batch, '%s/lr_samples.png' % opt.outf, normalize=True, nrow=3)
-                vutils.save_image(target_img_batch, '%s/hr_real_samples.png' % opt.outf, normalize=True, nrow=3)
-                vutils.save_image(output_img_batch, '%s/hr_fake_samples.png' % opt.outf, normalize=True, nrow=3)
+            # Print 5 image batches per epoch. Will be overwritten per epoch, otherwise there would be too many output images saved
+            if i % 10 == 0:
+                vutils.save_image(input_img_batch, '%s/lr_samples_batch_%04d.png' % (opt.outf, i), normalize=True, nrow=3)
+                vutils.save_image(target_img_batch, '%s/hr_real_samples_batch_%04d.png' % (opt.outf, i), normalize=True, nrow=3)
+                vutils.save_image(output_img_batch, '%s/hr_fake_samples_batch_%04d.png' % (opt.outf, i), normalize=True, nrow=3)
+            
+            ###########################
 
-    torch.save({
-        'epoch': epoch,
-        'g_state_dict': netG.state_dict(),
-        'optimizerG_state_dict': optimizerG.state_dict(),
-        'loss_G': errG.detach().item(),
-        }, '%s/epoch_%d.pth' % (opt.outf, epoch))
+            minibatch_updates += 1
+            if (minibatch_updates + 1) % (2 * (10 ** 5)) == 0:
+                # How to change learning rate: https://stackoverflow.com/questions/48324152/pytorch-how-to-change-the-learning-rate-of-an-optimizer-at-any-given-moment-no
+                for g in optimizerG.param_groups:
+                    g['lr'] /= 2
+
+        if epoch % 10 == 0:
+            torch.save({
+                'epoch': epoch,
+                'g_state_dict': netG.state_dict(),
+                'optimizerG_state_dict': optimizerG.state_dict(),
+                'loss_G': errG.detach().item(),
+                }, '%s/epoch_%d.pth' % (opt.outf, epoch))
 
 if __name__ == '__main__':
     main()
