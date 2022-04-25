@@ -19,22 +19,33 @@ Expected Dataset File Structure:
 
 DIV2K
 -> DIV2K_train_HR
-    -> HR images
+    -> 0001.png ... 0800.png
 -> DIV2K_train_LR_bicubic
     -> X4
-        -> LR images
+        -> 0001x4.png ... 0800x4.png
+-> DIV2K_valid_HR
+    -> 0801.png ... 0900.png
+-> DIV2K_valid_LR_bicubic
+    -> X4
+        -> 0801x4.png ... 0900x4.png
 
 Download link for HR images: http://data.vision.ee.ethz.ch/cvl/DIV2K/DIV2K_train_HR.zip
 Download link for LR images: http://data.vision.ee.ethz.ch/cvl/DIV2K/DIV2K_train_LR_bicubic_X4.zip
+Download link for validation set HR images: http://data.vision.ee.ethz.ch/cvl/DIV2K/DIV2K_valid_HR.zip
+Download link for validation set LR images: http://data.vision.ee.ethz.ch/cvl/DIV2K/DIV2K_valid_LR_bicubic_X4.zip
+
 ^ Paste these links into a web browser to download, then put the unzipped folders into a folder called "DIV2K" ^
 """
 
 class SRDataset(Dataset):
-    def __init__(self, root, cropSize):
+    def __init__(self, root, cropSize, input_dir, target_dir):
         self.root = root
+        self.input_dir = input_dir
+        self.target_dir = target_dir
         samples = self.make_dataset(self.root)
         self.cropSize = cropSize
         self.samples = samples
+
     
     def __getitem__(self, index):
         data_path, target_path = self.samples[index]
@@ -73,24 +84,13 @@ class SRDataset(Dataset):
             return img.convert("RGB")
 
     def make_dataset(self, directory):
-        data_folder = os.path.join(directory, "DIV2K_train_LR_bicubic", "X4")
-        target_folder = os.path.join(directory, "DIV2K_train_HR")
+        data_folder = os.path.join(directory, self.input_dir)
+        target_folder = os.path.join(directory, self.target_dir)
         data_paths = [os.path.join(data_folder, f) for f in sorted(os.listdir(data_folder)) if f.endswith(".png")]
         target_paths = [os.path.join(target_folder, f) for f in sorted(os.listdir(target_folder)) if f.endswith(".png")]
         return list(zip(data_paths, target_paths))
 
-def main():
-    torch.set_printoptions(threshold=1)
-    logging.basicConfig(level=logging.INFO, filename='train_log.txt')
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--batchSize', type=int, default=16, help='input batch size')
-    parser.add_argument('--imageSize', type=int, default=48, help='the height / width of the input image to network')
-    parser.add_argument('--lr', type=float, default=1e-4, help='learning rate')
-    parser.add_argument('--workers', type=int, help='number of data loading workers', default=2)
-    parser.add_argument('--outf', default='./Output', help='folder to output images and model checkpoints')
-
-    opt = parser.parse_args()
-
+def train(opt):
     model = None
     # model = torch.load(os.path.join(opt.outf, 'epoch_1.pth'), map_location='cpu')
 
@@ -109,7 +109,7 @@ def main():
 
     cudnn.benchmark = True
 
-    dataset = SRDataset('./DIV2K', opt.imageSize)
+    dataset = SRDataset('./DIV2K', opt.imageSize, os.path.join('DIV2K_train_LR_bicubic', 'X4'), 'DIV2K_train_HR')
 
     dataloader = DataLoader(dataset, batch_size=opt.batchSize,
                                             shuffle=True, num_workers=int(opt.workers), drop_last=True)
@@ -179,6 +179,74 @@ def main():
                 'optimizerG_state_dict': optimizerG.state_dict(),
                 'loss_G': errG.detach().item(),
                 }, '%s/epoch_%d.pth' % (opt.outf, epoch))
+
+def validation(opt):
+    dataset = SRDataset('./DIV2K', opt.imageSize, os.path.join('DIV2K_valid_LR_bicubic', 'X4'), 'DIV2K_valid_HR')
+
+    dataloader = DataLoader(dataset, batch_size=opt.batchSize,
+                                            shuffle=True, num_workers=int(opt.workers), drop_last=True)
+
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    
+    netG = Generator().to(device)
+    optimizerG = optim.Adam(netG.parameters(), lr=opt.lr, betas=(0.9, 0.999), eps=1e-08)
+
+    ### Model loaded in here, change to correct one! ###
+    model = torch.load(os.path.join(opt.outf, 'epoch_1000.pth'), map_location='cpu')
+    ####################################################
+
+    netG.load_state_dict(model['g_state_dict'], strict=True)
+    optimizerG.load_state_dict(model['optimizerG_state_dict'])
+    print("Loaded model that was trained until epoch %d" % (model['epoch']))
+    print('G params: ' + str(sum(p.numel() for p in netG.parameters() if p.requires_grad)))
+
+    netG.eval()
+    total_loss = 0
+
+    with torch.no_grad():
+        for i, sample in enumerate(dataloader):
+            input_img_batch = sample[0]
+            target_img_batch = sample[1]
+            output_img_batch = netG(input_img_batch)
+
+            L1 = torch.nn.L1Loss()
+            errG = L1(output_img_batch, target_img_batch)
+            loss = errG.detach().item()
+            total_loss += loss
+            log_str = '[VALIDATION][%d/%d] Loss_G: %.4f' % (i, len(dataloader), loss)
+            print(log_str)
+            logging.info(log_str)
+
+            vutils.save_image(input_img_batch, '%s/validation_lr_samples_batch_%04d.png' % (opt.outf, i), normalize=True, nrow=3)
+            vutils.save_image(target_img_batch, '%s/validation_hr_real_samples_batch_%04d.png' % (opt.outf, i), normalize=True, nrow=3)
+            vutils.save_image(output_img_batch, '%s/validation_hr_fake_samples_batch_%04d.png' % (opt.outf, i), normalize=True, nrow=3)
+
+    return total_loss / len(dataloader)
+
+
+def main():
+    torch.set_printoptions(threshold=1)
+    logging.basicConfig(level=logging.INFO, filename='train_log.txt')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--batchSize', type=int, default=16, help='input batch size')
+    parser.add_argument('--imageSize', type=int, default=48, help='the height / width of the input image to network')
+    parser.add_argument('--lr', type=float, default=1e-4, help='learning rate')
+    parser.add_argument('--workers', type=int, help='number of data loading workers', default=2)
+    parser.add_argument('--outf', default='./Output', help='folder to output images and model checkpoints')
+    parser.add_argument('--mode', type=str, default='TRAIN', help='one of "TRAIN", "VALIDATION", or "TEST"')
+    opt = parser.parse_args()
+
+    if opt.mode == 'TRAIN':
+        train(opt)
+    elif opt.mode == 'VALIDATION':
+        avg_loss = validation(opt)
+        log_str = '[VALIDATION] Average loss: %.4f' % (avg_loss)
+        print(log_str)
+        logging.info(log_str)
+    elif opt.mode == 'TEST':
+        print("Test hasn't been implemented yet!")
+    else:
+        print('ERROR: Invalid mode! mode should be one of "TRAIN", "VALIDATION", or "TEST"')
 
 if __name__ == '__main__':
     main()
