@@ -160,9 +160,9 @@ def train(opt):
 
             # Print 5 image batches per epoch. Will be overwritten per epoch, otherwise there would be too many output images saved
             if i % 10 == 0:
-                vutils.save_image(input_img_batch, '%s/lr_samples_batch_%04d.png' % (opt.outf, i), normalize=True, nrow=3)
-                vutils.save_image(target_img_batch, '%s/hr_real_samples_batch_%04d.png' % (opt.outf, i), normalize=True, nrow=3)
-                vutils.save_image(output_img_batch, '%s/hr_fake_samples_batch_%04d.png' % (opt.outf, i), normalize=True, nrow=3)
+                vutils.save_image(input_img_batch, '%s/lr_samples_batch_%04d.png' % (opt.outf, i), normalize=True, nrow=4)
+                vutils.save_image(target_img_batch, '%s/hr_real_samples_batch_%04d.png' % (opt.outf, i), normalize=True, nrow=4)
+                vutils.save_image(output_img_batch, '%s/hr_fake_samples_batch_%04d.png' % (opt.outf, i), normalize=True, nrow=4)
             
             ###########################
 
