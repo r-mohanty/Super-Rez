@@ -121,7 +121,7 @@ class GeneratorUpsampleBlock(nn.Module):
           y = self.Resampler(self.NonLinearity2(y))
           
           y = self.LinearLayer3(y)
-          y = nn.functional.interpolate(x, scale_factor=2, mode='bilinear', align_corners=False) + y
+          y = nn.functional.interpolate(x, scale_factor=2, mode='bilinear', align_corners=False, antialias=False) + y
           
           return y, self.NonLinearity3(y)
 
@@ -153,7 +153,7 @@ class Generator(nn.Module):
         
         for Upsample, Aggregate in zip(self.Upsamplers, self.ToRGB):
             AggregatedFeatures, ActivatedFeatures = Upsample(AggregatedFeatures, ActivatedFeatures)
-            ImageOutput = nn.functional.interpolate(ImageOutput, scale_factor=2, mode='bilinear', align_corners=False) + Aggregate(ActivatedFeatures)
+            ImageOutput = nn.functional.interpolate(ImageOutput, scale_factor=2, mode='bilinear', align_corners=False, antialias=False) + Aggregate(ActivatedFeatures)
         
         return ImageOutput
 
