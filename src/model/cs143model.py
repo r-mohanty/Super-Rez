@@ -1,5 +1,5 @@
 from model import common
-from Networks import Generator
+from model.Networks import Generator
 
 import torch.nn as nn
 
