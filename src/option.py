@@ -27,7 +27,7 @@ parser.add_argument('--data_train', type=str, default='DIV2K',
                     help='train dataset name')
 parser.add_argument('--data_test', type=str, default='DIV2K',
                     help='test dataset name')
-parser.add_argument('--data_range', type=str, default='1-800/801-810',
+parser.add_argument('--data_range', type=str, default='1-800/801-900',
                     help='train/test data range')
 parser.add_argument('--ext', type=str, default='sep',
                     help='dataset file extension')
@@ -146,7 +146,7 @@ parser.add_argument('--save_gt', action='store_true',
 args = parser.parse_args()
 template.set_template(args)
 
-args.scale = list(map(lambda x: int(x), args.scale.split('+')))
+args.scale = list(map(lambda x: int(x), args.scale.split('+')))0
 args.data_train = args.data_train.split('+')
 args.data_test = args.data_test.split('+')
 
@@ -158,4 +158,5 @@ for arg in vars(args):
         vars(args)[arg] = True
     elif vars(args)[arg] == 'False':
         vars(args)[arg] = False
+
 
