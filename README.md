@@ -1,3 +1,7 @@
+# note: set allow_tf32 to False!!!!
+
+
+
 # Super-Rez
 
 # Credit Attribution

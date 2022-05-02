@@ -12,9 +12,21 @@ def MSRInitializer(Layer, ActivationGain=1):
     
     return Layer
 
+class NoiseInjector(nn.Module):
+    Sampler = lambda x: torch.randn(*x.shape, device=x.device)
+    
+    def __init__(self, InputChannels):
+        super(NoiseInjector, self).__init__()
+        
+        self.Scale = nn.Parameter(torch.empty(InputChannels))
+        self.Scale.data.zero_()
+        
+    def forward(self, x):
+        return self.Scale.view(1, -1, 1, 1) * NoiseInjector.Sampler(x) + x
+        
 class BiasedActivation(nn.Module):
     Gain = math.sqrt(2)
-    Function = nn.functional.silu
+    Function = nn.functional.mish
     
     def __init__(self, InputUnits, ConvolutionalLayer=True):
         super(BiasedActivation, self).__init__()
@@ -37,17 +49,20 @@ class GeneratorBlock(nn.Module):
           self.LinearLayer1 = MSRInitializer(nn.Conv2d(InputChannels, CompressedChannels, kernel_size=ReceptiveField, stride=1, padding=(ReceptiveField - 1) // 2, padding_mode='reflect', bias=False), ActivationGain=BiasedActivation.Gain)
           self.LinearLayer2 = MSRInitializer(nn.Conv2d(CompressedChannels, InputChannels, kernel_size=ReceptiveField, stride=1, padding=(ReceptiveField - 1) // 2, padding_mode='reflect', bias=False), ActivationGain=0)
           
+          self.NoiseLayer1 = NoiseInjector(CompressedChannels)
+          self.NoiseLayer2 = NoiseInjector(InputChannels)
+          
           self.NonLinearity1 = BiasedActivation(CompressedChannels)
           self.NonLinearity2 = BiasedActivation(InputChannels)
-
+          
       def forward(self, x, ActivationMaps):
           y = self.LinearLayer1(ActivationMaps)
-          y = self.NonLinearity1(y)
+          y = self.NonLinearity1(self.NoiseLayer1(y))
           
           y = self.LinearLayer2(y)
           y = x + y
           
-          return y, self.NonLinearity2(y)
+          return y, self.NonLinearity2(self.NoiseLayer2(y))
 
 class DiscriminatorBlock(nn.Module):
       def __init__(self, InputChannels, CompressionFactor, ReceptiveField):
@@ -107,6 +122,10 @@ class GeneratorUpsampleBlock(nn.Module):
           self.LinearLayer2 = MSRInitializer(nn.Conv2d(CompressedChannels, CompressedChannels * 4, kernel_size=1, stride=1, padding=0, bias=False), ActivationGain=BiasedActivation.Gain)
           self.LinearLayer3 = MSRInitializer(nn.Conv2d(CompressedChannels, OutputChannels, kernel_size=ReceptiveField, stride=1, padding=(ReceptiveField - 1) // 2, padding_mode='reflect', bias=False), ActivationGain=0)
           
+          self.NoiseLayer1 = NoiseInjector(CompressedChannels)
+          self.NoiseLayer2 = NoiseInjector(CompressedChannels)
+          self.NoiseLayer3 = NoiseInjector(OutputChannels)
+          
           self.NonLinearity1 = BiasedActivation(CompressedChannels)
           self.NonLinearity2 = BiasedActivation(CompressedChannels)
           self.NonLinearity3 = BiasedActivation(OutputChannels)
@@ -120,13 +139,13 @@ class GeneratorUpsampleBlock(nn.Module):
               x = self.ShortcutLayer(x)
           
           y = self.LinearLayer1(ActivationMaps)
-          y = self.LinearLayer2(self.NonLinearity1(y))
-          y = self.NonLinearity2(self.Resampler(y))
+          y = self.LinearLayer2(self.NonLinearity1(self.NoiseLayer1(y)))
+          y = self.NonLinearity2(self.NoiseLayer2(self.Resampler(y)))
           
           y = self.LinearLayer3(y)
           y = nn.functional.interpolate(x, scale_factor=2, mode='bilinear', align_corners=False, antialias=False) + y
           
-          return y, self.NonLinearity3(y)
+          return y, self.NonLinearity3(self.NoiseLayer3(y))
 
 class DiscriminatorDownsampleBlock(nn.Module):
       def __init__(self, InputChannels, OutputChannels, CompressionFactor, ReceptiveField):
@@ -158,7 +177,7 @@ class DiscriminatorDownsampleBlock(nn.Module):
               x = self.ShortcutLayer(x)
 
           return x + y
-
+     
 class GeneratorStage(nn.Module):
       def __init__(self, InputChannels, FeatureChannels, Blocks, CompressionFactor, ReceptiveField):
           super(GeneratorStage, self).__init__()
@@ -188,13 +207,14 @@ class GeneratorPrologLayer(nn.Module):
         super(GeneratorPrologLayer, self).__init__()
         
         self.LinearLayer = MSRInitializer(nn.Conv2d(3, OutputChannels, kernel_size=ReceptiveField, stride=1, padding=(ReceptiveField - 1) // 2, padding_mode='reflect', bias=False), ActivationGain=BiasedActivation.Gain)
+        self.NoiseLayer = NoiseInjector(OutputChannels)
         self.NonLinearity = BiasedActivation(OutputChannels)
         
         self.ToFeatures = MSRInitializer(nn.Conv2d(OutputChannels, FeatureChannels, kernel_size=1, stride=1, padding=0, bias=False), ActivationGain=BiasedActivation.Gain)
         
     def forward(self, x):
         x = self.LinearLayer(x)
-        ActivationMaps = self.NonLinearity(x)
+        ActivationMaps = self.NonLinearity(self.NoiseLayer(x))
         
         return x, ActivationMaps, self.ToFeatures(ActivationMaps)
 
@@ -211,7 +231,7 @@ class DiscriminatorEpilogLayer(nn.Module):
       def forward(self, x):
           y = self.LinearLayer1(self.NonLinearity1(x)).view(x.shape[0], -1)
           return self.NonLinearity2(self.LinearLayer2(y))
-      
+
 class Generator(nn.Module):
     def __init__(self, StemWidth=256, FeatureWidths=[512, 256, 128], BlocksPerStage=[16, 16, 16, 16], CompressionFactor=4, ReceptiveField=3):
         super(Generator, self).__init__()
@@ -219,6 +239,7 @@ class Generator(nn.Module):
         self.Stem = GeneratorPrologLayer(StemWidth, FeatureWidths[0], ReceptiveField)
         self.Stages = nn.ModuleList([GeneratorStage(StemWidth, FeatureWidths[0], x, CompressionFactor, ReceptiveField) for x in BlocksPerStage])
         
+        self.FeatureNoiseLayer = NoiseInjector(FeatureWidths[0])
         self.FeatureNonLinearity = BiasedActivation(FeatureWidths[0])
 
         Upsamplers = []
@@ -236,7 +257,7 @@ class Generator(nn.Module):
         for Stage in self.Stages:
             x, ActivationMaps, FeatureResidual  = Stage(x, ActivationMaps)
             AggregatedFeatures += FeatureResidual
-        ActivatedFeatures = self.FeatureNonLinearity(AggregatedFeatures)
+        ActivatedFeatures = self.FeatureNonLinearity(self.FeatureNoiseLayer(AggregatedFeatures))
         
         for Upsample, Aggregate in zip(self.Upsamplers, self.ToRGB):
             AggregatedFeatures, ActivatedFeatures = Upsample(AggregatedFeatures, ActivatedFeatures)
@@ -267,6 +288,8 @@ class Discriminator(nn.Module):
         
         x = self.EpilogLayer(x)
         return self.CriticLayer(x).view(x.shape[0])
+
+
 
 
 
