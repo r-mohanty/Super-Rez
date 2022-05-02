@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from MATLAB import imresize
+from loss.MATLAB import imresize
 
 def ZeroCenteredGradientPenalty(Samples, Critics):
     Gradient, = torch.autograd.grad(outputs=Critics.sum(), inputs=Samples, create_graph=True, only_inputs=True)

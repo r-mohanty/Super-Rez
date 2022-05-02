@@ -46,7 +46,7 @@ class Trainer():
 
             self.optimizer.zero_grad()
             sr = self.model(lr, 0)
-            loss = self.loss(sr, hr)
+            loss = self.loss(sr, hr, lr)
             loss.backward()
             if self.args.gclip > 0:
                 utils.clip_grad_value_(

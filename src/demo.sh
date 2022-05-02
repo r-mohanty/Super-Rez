@@ -1,3 +1,7 @@
+python main.py --model cs143generative --scale 4 --patch_size 192 --loss 1*Fidelity --save cs143_x4_gen --reset --batch_size 1
+
+
+
 # Our model
 python main.py --model cs143model --scale 4 --patch_size 192 --save cs143_x4_L1 --resume -1 --load cs143_x4_L1 --seed 123
 # python main.py --model cs143model --scale 4 --patch_size 192 --save cs143_x4_L1 --reset

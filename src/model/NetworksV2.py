@@ -301,7 +301,7 @@ class Discriminator(nn.Module):
 # Network2x = Generator(FeatureWidths=[512, 256])
 # Network4x = Generator()
 
-# D = Discriminator(BasisSize=6, StageWidths=[256, 512, 512, 512, 1024], BlocksPerStage=[1, 1, 1, 2, 2])
+# D = Discriminator(BasisSize=3, StageWidths=[256, 256, 512, 512, 512, 1024], BlocksPerStage=[1, 1, 2, 2, 2, 1])
 
 # print('G params: ' + str(sum(p.numel() for p in Network4x.parameters() if p.requires_grad)))
 # print('D params: ' + str(sum(p.numel() for p in D.parameters() if p.requires_grad)))

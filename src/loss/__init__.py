@@ -11,6 +11,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from loss.LossV2 import FidelityLoss
+
 class Loss(nn.modules.loss._Loss):
     def __init__(self, args, ckp):
         super(Loss, self).__init__()
@@ -37,6 +39,14 @@ class Loss(nn.modules.loss._Loss):
                     args,
                     loss_type
                 )
+                
+                
+                
+            elif loss_type == 'Fidelity':
+                loss_function = FidelityLoss
+
+
+
 
             self.loss.append({
                 'type': loss_type,
@@ -66,10 +76,25 @@ class Loss(nn.modules.loss._Loss):
 
         if args.load != '': self.load(ckp.dir, cpu=args.cpu)
 
-    def forward(self, sr, hr):
+    def forward(self, sr, hr, lr):
         losses = []
         for i, l in enumerate(self.loss):
-            if l['function'] is not None:
+            if l['type'] == 'Fidelity':
+                loss = l['function'](sr, lr)
+                effective_loss = l['weight'] * loss
+                losses.append(effective_loss)
+                self.log[-1, i] += effective_loss.item()
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            elif l['function'] is not None:
                 loss = l['function'](sr, hr)
                 effective_loss = l['weight'] * loss
                 losses.append(effective_loss)
