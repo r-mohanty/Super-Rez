@@ -1,4 +1,4 @@
-python main.py --model cs143generative --scale 4 --patch_size 192 --loss 1*Fidelity --save cs143_x4_gen --reset --batch_size 1
+python main.py --model cs143generative --scale 4 --patch_size 192 --loss 1*Fidelity+1*Regularization --r1_gamma 1 --save cs143_x4_gen --reset --print_every 1 --batch_size 1 --cpu
 
 
 

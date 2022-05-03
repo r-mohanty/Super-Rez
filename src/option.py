@@ -3,6 +3,10 @@ import template
 
 parser = argparse.ArgumentParser(description='EDSR and MDSR')
 
+parser.add_argument('--r1_gamma', type=float, default=10.,
+                    help='r1 gradient penalty gamma')
+
+
 parser.add_argument('--debug', action='store_true',
                     help='Enables debug mode')
 parser.add_argument('--template', default='.',

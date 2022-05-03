@@ -26,7 +26,7 @@ class NoiseInjector(nn.Module):
         
 class BiasedActivation(nn.Module):
     Gain = math.sqrt(2)
-    Function = nn.functional.mish
+    Function = nn.functional.silu
     
     def __init__(self, InputUnits, ConvolutionalLayer=True):
         super(BiasedActivation, self).__init__()

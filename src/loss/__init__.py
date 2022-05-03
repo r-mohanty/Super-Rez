@@ -21,10 +21,10 @@ class Fidelity(nn.Module):
         return FidelityLoss(HighResolutionSamples, LowResolutionSamples)
         
 class Loss(nn.modules.loss._Loss):
-    def __init__(self, args, ckp):
+    def __init__(self, args, ckp, G):
         super(Loss, self).__init__()
         print('Preparing loss function:')
-
+        
         self.n_GPUs = args.n_GPUs
         self.loss = []
         self.loss_module = nn.ModuleList()
@@ -49,8 +49,25 @@ class Loss(nn.modules.loss._Loss):
                 
                 
                 
+                
+                
+                
             elif loss_type == 'Fidelity':
                 loss_function = Fidelity()
+                
+            elif loss_type == 'Regularization':
+                module = import_module('loss.Regularization')
+                loss_function = getattr(module, 'Adversarial')(args, G)
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -88,6 +105,11 @@ class Loss(nn.modules.loss._Loss):
         for i, l in enumerate(self.loss):
             if l['type'] == 'Fidelity':
                 loss = l['function'](sr, lr)
+                effective_loss = l['weight'] * loss
+                losses.append(effective_loss)
+                self.log[-1, i] += effective_loss.item()
+            elif l['type'] == 'Regularization':
+                loss = l['function'](sr, hr)
                 effective_loss = l['weight'] * loss
                 losses.append(effective_loss)
                 self.log[-1, i] += effective_loss.item()
