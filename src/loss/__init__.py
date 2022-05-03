@@ -13,6 +13,13 @@ import torch.nn.functional as F
 
 from loss.LossV2 import FidelityLoss
 
+class Fidelity(nn.Module):
+    def __init__(self):
+        super(Fidelity, self).__init__()
+        
+    def forward(self, HighResolutionSamples, LowResolutionSamples):
+        return FidelityLoss(HighResolutionSamples, LowResolutionSamples)
+        
 class Loss(nn.modules.loss._Loss):
     def __init__(self, args, ckp):
         super(Loss, self).__init__()
@@ -43,7 +50,7 @@ class Loss(nn.modules.loss._Loss):
                 
                 
             elif loss_type == 'Fidelity':
-                loss_function = FidelityLoss
+                loss_function = Fidelity()
 
 
 
