@@ -9,17 +9,18 @@ import torch.nn.utils as utils
 from tqdm import tqdm
 
 class Trainer():
-    def __init__(self, args, loader, my_model, my_loss, ckp):
+    def __init__(self, args, loader, my_model, model_ema, my_loss, ckp):
         self.args = args
         self.scale = args.scale
+        
+        self.ema_beta = args.ema_beta
 
         self.ckp = ckp
         self.loader_train = loader.loader_train
         self.loader_test = loader.loader_test
         self.model = my_model
+        self.model_ema = model_ema
         self.loss = my_loss
-        
-        args.betas = (0, 0.99)
         self.optimizer = utility.make_optimizer(args, self.model)
 
         if self.args.load != '':
@@ -56,6 +57,21 @@ class Trainer():
                     self.args.gclip
                 )
             self.optimizer.step()
+            
+            
+            
+            ###########################
+            
+            with torch.no_grad():
+                for p_ema, p in zip(self.model_ema.parameters(), self.model.parameters()):
+                    p_ema.copy_(p.lerp(p_ema, self.ema_beta))
+                for b_ema, b in zip(self.model_ema.buffers(), self.model.buffers()):
+                    b_ema.copy_(b)
+                    
+            ###########################
+            
+            
+            
 
             timer_model.hold()
 
@@ -81,7 +97,6 @@ class Trainer():
         self.ckp.add_log(
             torch.zeros(1, len(self.loader_test), len(self.scale))
         )
-        self.model.eval()
 
         timer_test = utility.timer()
         if self.args.save_results: self.ckp.begin_background()
@@ -90,7 +105,7 @@ class Trainer():
                 d.dataset.set_scale(idx_scale)
                 for lr, hr, filename in tqdm(d, ncols=80):
                     lr, hr = self.prepare(lr, hr)
-                    sr = self.model(lr, idx_scale)
+                    sr = self.model_ema(lr, idx_scale)
                     sr = utility.quantize(sr, self.args.rgb_range)
 
                     save_list = [sr]

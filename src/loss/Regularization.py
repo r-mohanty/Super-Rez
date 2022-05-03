@@ -13,10 +13,7 @@ class Adversarial(nn.Module):
         super(Adversarial, self).__init__()
         
         self.dis = Discriminator(BasisSize=3, StageWidths=[256, 256, 512, 512, 512, 1024], BlocksPerStage=[1, 1, 2, 2, 2, 1])
-        
-        args.betas = (0, 0.99)
-        self.optimizer = utility.make_optimizer(args, self.dis)
-        
+        self.optimizer = utility.make_optimizer(args, self.dis, is_dis=True)
         self.r1_gamma = args.r1_gamma
         
         self.G = G

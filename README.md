@@ -1,5 +1,22 @@
 # note: set allow_tf32 to False!!!!
 
+# TODO List
+gradient accumulation
+print D loss, print R1
+plot D loss, plot R1
+save EMA_Model, save D
+resume EMA_Model, resume D
+use EMA_Model to visualize and test
+
+# hyperparams to mess with
+batch_size
+patch_size
+ema_beta: magic, don't touch!
+lr: learing rate for G
+d_lr: learning rate for D
+betas: beta1, beta2 for the ADAM optimizer
+loss: find the right mix of fidelity and regularization
+r1_gamma: multiplier for R1 gradient penalty
 
 
 # Super-Rez

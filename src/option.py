@@ -5,6 +5,10 @@ parser = argparse.ArgumentParser(description='EDSR and MDSR')
 
 parser.add_argument('--r1_gamma', type=float, default=10.,
                     help='r1 gradient penalty gamma')
+parser.add_argument('--d_lr', type=float, default=1e-4,
+                    help='discriminator learning rate')
+parser.add_argument('--ema_beta', type=float, default=0.999,
+                    help='EMA beta')
 
 
 parser.add_argument('--debug', action='store_true',
@@ -116,7 +120,7 @@ parser.add_argument('--optimizer', default='ADAM',
                     help='optimizer to use (SGD | ADAM | RMSprop)')
 parser.add_argument('--momentum', type=float, default=0.9,
                     help='SGD momentum')
-parser.add_argument('--betas', type=tuple, default=(0.9, 0.999),
+parser.add_argument('--betas', type=float, nargs='+', default=[0.9, 0.99],
                     help='ADAM beta')
 parser.add_argument('--epsilon', type=float, default=1e-8,
                     help='ADAM epsilon for numerical stability')

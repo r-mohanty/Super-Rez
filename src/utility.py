@@ -180,20 +180,20 @@ def calc_psnr(sr, hr, scale, rgb_range, dataset=None):
 
     return -10 * math.log10(mse)
 
-def make_optimizer(args, target):
+def make_optimizer(args, target, is_dis=False):
     '''
         make optimizer and scheduler together
     '''
     # optimizer
     trainable = filter(lambda x: x.requires_grad, target.parameters())
-    kwargs_optimizer = {'lr': args.lr, 'weight_decay': args.weight_decay}
+    kwargs_optimizer = {'lr': args.d_lr if is_dis else args.lr, 'weight_decay': args.weight_decay}
 
     if args.optimizer == 'SGD':
         optimizer_class = optim.SGD
         kwargs_optimizer['momentum'] = args.momentum
     elif args.optimizer == 'ADAM':
         optimizer_class = optim.Adam
-        kwargs_optimizer['betas'] = args.betas
+        kwargs_optimizer['betas'] = (args.betas[0], args.betas[1])
         kwargs_optimizer['eps'] = args.epsilon
     elif args.optimizer == 'RMSprop':
         optimizer_class = optim.RMSprop
