@@ -11,23 +11,22 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from loss.LossV2 import FidelityLoss
 
-class Fidelity(nn.Module):
-    def __init__(self):
-        super(Fidelity, self).__init__()
-        
-    def forward(self, HighResolutionSamples, LowResolutionSamples):
-        return FidelityLoss(HighResolutionSamples, LowResolutionSamples)
         
 class Loss(nn.modules.loss._Loss):
     def __init__(self, args, ckp, G):
         super(Loss, self).__init__()
         print('Preparing loss function:')
         
+        self.G = G
+        
         self.n_GPUs = args.n_GPUs
         self.loss = []
         self.loss_module = nn.ModuleList()
+        
+        fidelity_weight = -1
+        regularization_weight = -1
+        
         for loss in args.loss.split('+'):
             weight, loss_type = loss.split('*')
             if loss_type == 'MSE':
@@ -48,27 +47,15 @@ class Loss(nn.modules.loss._Loss):
                 )
                 
                 
-                
-                
-                
-                
+
             elif loss_type == 'Fidelity':
-                loss_function = Fidelity()
+                fidelity_weight = float(weight)
+                continue
                 
             elif loss_type == 'Regularization':
-                module = import_module('loss.Regularization')
-                loss_function = getattr(module, 'Adversarial')(args, G)
-
-
-
-
-
-
-
-
-
-
-
+                regularization_weight = float(weight)
+                continue
+                
 
 
 
@@ -80,8 +67,22 @@ class Loss(nn.modules.loss._Loss):
             if loss_type.find('GAN') >= 0:
                 self.loss.append({'type': 'DIS', 'weight': 1, 'function': None})
 
-        if len(self.loss) > 1:
-            self.loss.append({'type': 'Total', 'weight': 0, 'function': None})
+
+        if regularization_weight > 0:
+            self.loss.append({'type': 'Loss_D', 'weight': 1, 'function': None})
+            self.loss.append({'type': 'Loss_G', 'weight': 1, 'function': None})
+            self.loss.append({'type': 'R1', 'weight': 1, 'function': None})
+            self.loss.append({'type': 'Fidelity', 'weight': 1, 'function': None})
+            
+            module = import_module('loss.Main')
+            loss_function = getattr(module, 'Adversarial')(args, G, fidelity_weight, regularization_weight)
+            self.loss.append({'type': 'Main', 'weight': 1, 'function': loss_function})
+            
+            
+
+
+
+
 
         for l in self.loss:
             if l['function'] is not None:
@@ -100,42 +101,27 @@ class Loss(nn.modules.loss._Loss):
 
         if args.load != '': self.load(ckp.dir, cpu=args.cpu)
 
-    def forward(self, sr, hr, lr):
-        losses = []
+    def forward(self, hr_D, lr_D, hr_G, lr_G):
+        
+
+        
+        
         for i, l in enumerate(self.loss):
-            if l['type'] == 'Fidelity':
-                loss = l['function'](sr, lr)
-                effective_loss = l['weight'] * loss
-                losses.append(effective_loss)
-                self.log[-1, i] += effective_loss.item()
-            elif l['type'] == 'Regularization':
-                loss = l['function'](sr, hr)
-                effective_loss = l['weight'] * loss
-                losses.append(effective_loss)
-                self.log[-1, i] += effective_loss.item()
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            elif l['function'] is not None:
-                loss = l['function'](sr, hr)
-                effective_loss = l['weight'] * loss
-                losses.append(effective_loss)
-                self.log[-1, i] += effective_loss.item()
-            elif l['type'] == 'DIS':
-                self.log[-1, i] += self.loss[i - 1]['function'].loss
 
-        loss_sum = sum(losses)
-        if len(self.loss) > 1:
-            self.log[-1, -1] += loss_sum.item()
+            if l['type'] == 'Main':
+                errD, r1 = l['function'].updateD(lr_D, hr_D)
+                self.log[-1, i - 4] += errD
+                self.log[-1, i - 2] += r1
+                
+                errG, fidelity = l['function'](lr_G, hr_G)
+                self.log[-1, i - 3] += errG
+                self.log[-1, i - 1] += fidelity
+                
+                
+                
+                
 
-        return loss_sum
+
 
     def step(self):
         for l in self.get_loss_module():

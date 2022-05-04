@@ -44,13 +44,21 @@ class Trainer():
         self.loader_train.dataset.set_scale(0)
         for batch, (lr, hr, _,) in enumerate(self.loader_train):
             lr, hr = self.prepare(lr, hr)
+            
+            
+            lr_D = lr[0 : self.args.batch_size, :, :, :]
+            hr_D = hr[0 : self.args.batch_size, :, :, :]
+            lr_G = lr[self.args.batch_size : 2 * self.args.batch_size, :, :, :]
+            hr_G = hr[self.args.batch_size : 2 * self.args.batch_size, :, :, :]
+            
+            
+            
             timer_data.hold()
             timer_model.tic()
-
-            self.optimizer.zero_grad()
-            sr = self.model(lr, 0)
-            loss = self.loss(sr, hr, lr)
-            loss.backward()
+            
+            
+            self.loss(hr_D, lr_D, hr_G, lr_G)
+            
             if self.args.gclip > 0:
                 utils.clip_grad_value_(
                     self.model.parameters(),

@@ -14,7 +14,7 @@ class MyConcatDataset(ConcatDataset):
             if hasattr(d, 'set_scale'): d.set_scale(idx_scale)
 
 class Data:
-    def __init__(self, args):
+    def __init__(self, args, rgan=False):
         self.loader_train = None
         if not args.test_only:
             datasets = []
@@ -25,10 +25,11 @@ class Data:
 
             self.loader_train = dataloader.DataLoader(
                 MyConcatDataset(datasets),
-                batch_size=args.batch_size,
+                batch_size=args.batch_size * 2 if rgan else args.batch_size,
                 shuffle=True,
                 pin_memory=not args.cpu,
                 num_workers=args.n_threads,
+                drop_last=True
             )
 
         self.loader_test = []

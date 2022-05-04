@@ -10,6 +10,7 @@ use EMA_Model to visualize and test
 
 # hyperparams to mess with
 batch_size
+grad_accum
 patch_size
 ema_beta: magic, don't touch!
 lr: learing rate for G

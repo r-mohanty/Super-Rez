@@ -10,6 +10,9 @@ parser.add_argument('--d_lr', type=float, default=1e-4,
 parser.add_argument('--ema_beta', type=float, default=0.999,
                     help='EMA beta')
 
+parser.add_argument('--grad_accum', type=int, default=1,
+                    help='gradient accum steps for large batch size training')
+
 
 parser.add_argument('--debug', action='store_true',
                     help='Enables debug mode')

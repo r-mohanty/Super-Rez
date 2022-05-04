@@ -21,7 +21,8 @@ def main():
         # t.test()
     else:
         if checkpoint.ok:
-            loader = data.Data(args)
+            rgan = args.model == 'cs143generative'
+            loader = data.Data(args, rgan=rgan)
             _model = model.Model(args, checkpoint)
             
             model_ema = copy.deepcopy(_model).eval()
