@@ -10,6 +10,10 @@ In additions to making numerous modifications to the procedure defined by the ED
 
 Our report can be found in CS_1430_Final_Progress_Report_Final_Draft.pdf, which is in the main directory, and our poster can be found in 1430_poster_final.pdf, also in the main directory
 
+# Other Infromation
+
+The heart of the code is located in the src directory, and was run using the commands in the demo.sh file. Given the depth of our models, training is quite time-consuming and use of a high-end GPU is almost mandatory.
+
 # Citations
 
 [1] Bee Lim, Sanghyun Son, Heewon Kim, Seungjun Nah, and Kyoung Mu Lee, **"Enhanced Deep Residual Networks for Single Image Super-Resolution,"** <i>2nd NTIRE: New Trends in Image Restoration and Enhancement workshop and challenge on image super-resolution in conjunction with **CVPR 2017**. </i> [[PDF](http://openaccess.thecvf.com/content_cvpr_2017_workshops/w12/papers/Lim_Enhanced_Deep_Residual_CVPR_2017_paper.pdf)] [[arXiv](https://arxiv.org/abs/1707.02921)] [[Slide](https://cv.snu.ac.kr/research/EDSR/Presentation_v3(release).pptx)]
