@@ -1,3 +1,7 @@
+# Note
+
+Our public repository can be found at https://github.com/dustin-wu/Super-Rez
+
 # Credit Attribution
 
 In addition to owing inspiration to numerous papers as outlined in the Reference section of our report, We adapted the training procedure provided by the EDSR paper [1] to train our super-resolution network (cs143model.py), which was also inspired by the EDSR network.
