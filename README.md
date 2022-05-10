@@ -4,7 +4,11 @@ In addition to owing inspiration to numerous papers as outlined in the Reference
 
 # Contributions
 
-In additions to making numerous modifications to the procedure defined by the EDSR paper to produce outputs for our poster/report and to save model chckpoints, our primary contributions consist of novel generator and discriminator achitectures found in src/model/NetworksV2.py and loss founctions found in src/loss/LossV2.py
+In additions to making numerous modifications to the procedure defined by the EDSR paper to produce outputs for our poster/report and to save model chckpoints, our primary contributions consist of novel generator and discriminator achitectures found in src/model/NetworksV2.py, loss founctions found in src/loss/LossV2.py, and adding GAN training in the loss/adversarial.py and loss/Main.py files.
+
+# Report and Poster
+
+Our report can be found in CS_1430_Final_Progress_Report_Final_Draft.pdf, which is in the main directory, and our poster can be found in 1430_poster_final.pdf, also in the main directory
 
 # Citations
 
