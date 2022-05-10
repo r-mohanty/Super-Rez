@@ -6,13 +6,11 @@ In addition to owing inspiration to numerous papers as outlined in the Reference
 
 In additions to making numerous modifications to the procedure defined by the EDSR paper to produce outputs for our poster/report and to save model chckpoints, our primary contributions consist of novel generator and discriminator achitectures found in src/model/NetworksV2.py, loss founctions found in src/loss/LossV2.py, and adding GAN training in the src/loss/adversarial.py and src/loss/Main.py files.
 
-# Report and Poster
-
-Our report can be found in CS_1430_Final_Progress_Report_Final_Draft.pdf, which is in the main directory, and our poster can be found in 1430_poster_final.pdf, also in the main directory
-
 # Other Infromation
 
 The heart of the code is located in the src directory, and was run using the commands in the demo.sh file. Given the depth of our models, training is quite time-consuming and use of a high-end GPU is almost mandatory.
+
+Our report can be found in CS_1430_Final_Progress_Report_Final_Draft.pdf, which is in the main directory, and our poster can be found in 1430_poster_final.pdf, also in the main directory
 
 # Citations
 
