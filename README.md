@@ -1,6 +1,6 @@
 # Note
 
-Our public repository can be found at https://github.com/dustin-wu/Super-Rez
+The poster of this project is 
 
 # Credit Attribution
 
