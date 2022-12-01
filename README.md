@@ -1,6 +1,6 @@
 # Note
 
-The poster of this project is 
+The poster of this project is 1430_poster_final.pdf
 
 # Credit Attribution
 
