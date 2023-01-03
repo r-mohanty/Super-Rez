@@ -1,4 +1,4 @@
-# Note
+# Poster
 
 ![Alt text](poster.png)
 
