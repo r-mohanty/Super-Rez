@@ -1,6 +1,6 @@
 # Note
 
-![Alt text](1430_poster_final.jpg)
+![Alt text](poster.png)
 
 # Credit Attribution
 
