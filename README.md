@@ -1,6 +1,6 @@
 # Note
 
-The poster of this project can be found in the file 1430_poster_final.pdf.
+![Alt text](1430_poster_final.jpg)
 
 # Credit Attribution
 
